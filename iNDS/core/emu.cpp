@@ -153,7 +153,7 @@ void EMU_init(int lang)
 	NDS_3D_ChangeCore(cur3DCore); //OpenGL
 	
 	LOG("Init sound core\n");
-	SPU_ChangeSoundCore(SNDCORE_COREAUDIO, DESMUME_SAMPLE_RATE*8/60);
+	SPU_ChangeSoundCore(SNDCORE_COREAUDIO, DESMUME_SAMPLE_RATE*4/60);
 	
 	static const char* nickname = "iNDS";
 	fw_config.nickname_len = strlen(nickname);
