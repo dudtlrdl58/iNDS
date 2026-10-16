@@ -1,0 +1,39 @@
+name: iNDS Build Check
+
+on:
+  push:
+    branches: [fix-audio]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - name: Install dependencies
+        run: |
+          gem install cocoapods --no-document
+          pod install --repo-update
+
+      - name: Build iNDS
+        run: |
+          xcodebuild \
+            -workspace iNDS.xcworkspace \
+            -scheme iNDS \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
