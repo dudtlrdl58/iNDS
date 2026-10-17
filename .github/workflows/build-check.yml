@@ -154,4 +154,34 @@ jobs:
             GCC_THUMB_SUPPORT=YES \
             OTHER_CPLUSPLUSFLAGS='$(inherited) -Wno-c++11-narrowing' \
             build
-            
+        - name: Package unsigned IPA
+        run: |
+          APP_PATH="$(find "$HOME/Library/Developer/Xcode/DerivedData" -type d -path '*/Build/Products/Release-iphoneos/iNDS.app' -print -quit)"
+
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: iNDS.app not found"
+            exit 1
+          fi
+
+          echo "Found app: $APP_PATH"
+          test -f "$APP_PATH/Info.plist"
+
+          EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_PATH/Info.plist")
+          test -f "$APP_PATH/$EXECUTABLE"
+
+          mkdir -p ipa-stage/Payload
+          ditto "$APP_PATH" ipa-stage/Payload/iNDS.app
+
+          (cd ipa-stage && zip -qry "$GITHUB_WORKSPACE/iNDS-unsigned.ipa" Payload)
+
+          unzip -t iNDS-unsigned.ipa | tail -n 1
+          ls -lh iNDS-unsigned.ipa
+          echo "IPA packaging successful"
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: iNDS-fix-audio-IPA
+          path: iNDS-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
