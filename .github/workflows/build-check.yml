@@ -45,6 +45,23 @@ jobs:
         run: |
           xcodebuild -project iNDS.xcodeproj -target DeSmuME-OpenEmu -configuration Release -sdk iphoneos -showBuildSettings GCC_THUMB_SUPPORT=YES > /tmp/desmume-settings.txt
           grep -E 'THUMB|OTHER_CFLAGS|OTHER_CPLUSPLUSFLAGS|WARNING_CFLAGS' /tmp/desmume-settings.txt || true
+      - name: Fix DeSmuME WiFi macro
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("desmume/desmume/src/wifi.cpp")
+          text = path.read_text(encoding="utf-8")
+
+          old = 'printf("WIFI: "__VA_ARGS__);'
+          new = 'printf("WIFI: " __VA_ARGS__);'
+
+          if text.count(old) != 1:
+              raise SystemExit("WiFi macro not found exactly once")
+
+          path.write_text(text.replace(old, new), encoding="utf-8")
+          print("WiFi macro patched successfully")
+          PY
       - name: Build iNDS
         run: |
           xcodebuild \
