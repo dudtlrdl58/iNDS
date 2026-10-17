@@ -12,6 +12,14 @@
 #include "SPU.h"
 
 extern SoundInterface_struct SNDCoreAudio;
+struct SNDCoreAudioStats {
+    unsigned long long inputFrames;
+    unsigned long long outputFrames;
+    unsigned long long emptyCallbacks;
+    unsigned long long paddedFrames;
+};
+
+void SNDCoreAudioGetStats(SNDCoreAudioStats *stats);
 
 #define SNDCORE_COREAUDIO 1
 

@@ -43,6 +43,10 @@ static bool audioQueueStarted = false;
 static AudioQueueBufferRef aqBuffer[NUM_BUFFERS];
 static AudioQueueRef audioQueue;
 static pthread_mutex_t soundBufferMutex = PTHREAD_MUTEX_INITIALIZER;
+static unsigned long long diagInputFrames = 0;
+static unsigned long long diagOutputFrames = 0;
+static unsigned long long diagEmptyCallbacks = 0;
+static unsigned long long diagPaddedFrames = 0;
 
 void SNDCoreAudioCallback(void *data, AudioQueueRef mQueue, AudioQueueBufferRef mBuffer) {
     mBuffer->mAudioDataByteSize = sndBufferSize;
@@ -50,8 +54,9 @@ void SNDCoreAudioCallback(void *data, AudioQueueRef mQueue, AudioQueueBufferRef 
 
     pthread_mutex_lock(&soundBufferMutex);
 
-    if (numFullBuffers == 0) {
-        memset(mAudioData, 0, sndBufferSize);
+   if (numFullBuffers == 0) {
+    diagEmptyCallbacks++;
+    memset(mAudioData, 0, sndBufferSize);
     } else {
         memcpy(mAudioData, sndBuffer[curReadBuffer], sndBufferSize);
 
@@ -59,14 +64,21 @@ void SNDCoreAudioCallback(void *data, AudioQueueRef mQueue, AudioQueueBufferRef 
         curReadBuffer = (curReadBuffer + 1) % NUM_BUFFERS;
     }
 
-    pthread_mutex_unlock(&soundBufferMutex);
+    // Count frames submitted to AudioQueue.
+diagOutputFrames += sndBufferSize / 4;
 
-    AudioQueueEnqueueBuffer(mQueue, mBuffer, 0, NULL);
+pthread_mutex_unlock(&soundBufferMutex);
+
+AudioQueueEnqueueBuffer(mQueue, mBuffer, 0, NULL);
 }
 
 int SNDCoreAudioInit(int buffersize) {
     OSStatus err;
     curReadBuffer = curFillBuffer = numFullBuffers = 0;
+    diagInputFrames = 0;
+    diagOutputFrames = 0;
+    diagEmptyCallbacks = 0;
+    diagPaddedFrames = 0;
     
     // create queue
     AudioStreamBasicDescription outputFormat;
@@ -79,7 +91,7 @@ int SNDCoreAudioInit(int buffersize) {
     outputFormat.mChannelsPerFrame = 2;
     outputFormat.mBitsPerChannel = 16;
     outputFormat.mReserved = 0;
-    err = AudioQueueNewOutput(&outputFormat, SNDCoreAudioCallback, NULL, CFRunLoopGetMain(), kCFRunLoopCommonModes, 0, &audioQueue);
+    err = AudioQueueNewOutput(&outputFormat, SNDCoreAudioCallback, NULL, NULL, NULL, 0, &audioQueue);
     if (err != noErr) return -1;
     
     // create buffers
@@ -128,6 +140,8 @@ void SNDCoreAudioUpdateAudio(s16 *buffer, u32 num_samples) {
         buffer,
         samplesToCopy * 4
     );
+    diagInputFrames += samplesToCopy;
+    diagPaddedFrames += maxSamples - samplesToCopy;
 
     curFillBuffer = (curFillBuffer + 1) % NUM_BUFFERS;
     numFullBuffers++;
@@ -166,4 +180,17 @@ void SNDCoreAudioSetVolume(int volume) {
     float scaled = volume / 100.0;
     AudioQueueSetParameter(audioQueue, kAudioQueueParam_Volume, scaled);
      */
+}
+
+void SNDCoreAudioGetStats(SNDCoreAudioStats *stats) {
+    if (stats == NULL) return;
+
+    pthread_mutex_lock(&soundBufferMutex);
+
+    stats->inputFrames = diagInputFrames;
+    stats->outputFrames = diagOutputFrames;
+    stats->emptyCallbacks = diagEmptyCallbacks;
+    stats->paddedFrames = diagPaddedFrames;
+
+    pthread_mutex_unlock(&soundBufferMutex);
 }

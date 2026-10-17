@@ -24,6 +24,7 @@
 #import <GameController/GameController.h>
 
 #include "emu.h"
+#include "core/sndcoreaudio.h"
 //#include "mic.h"
 #import "SCLAlertView.h"
 
@@ -746,23 +747,78 @@ if (actualCoreElapsed >= 1.0) {
     }
 }
 
-- (void)calculateFPS:(NSInteger) frames
+- (void)calculateFPS:(NSInteger)frames
 {
     static CFTimeInterval lastDisplayTime = 0;
-    videoFps = videoFps * 0.95 + (frames / (CACurrentMediaTime() - lastDisplayTime)) * 0.05;
-    lastDisplayTime = CACurrentMediaTime();
-    
-    
+
+    CFTimeInterval now = CACurrentMediaTime();
+
+    if (lastDisplayTime > 0 && now > lastDisplayTime) {
+        double currentFPS = frames / (now - lastDisplayTime);
+        videoFps = videoFps * 0.95 + currentFPS * 0.05;
+    }
+
+    lastDisplayTime = now;
+
     static CFTimeInterval fpsUpdateTime = 0;
-    if (CACurrentMediaTime() - fpsUpdateTime > 1) {
+    static SNDCoreAudioStats previousStats = {};
+
+    if (now - fpsUpdateTime >= 1.0) {
+
+        SNDCoreAudioStats currentStats = {};
+        SNDCoreAudioGetStats(&currentStats);
+
+        double elapsed = fpsUpdateTime > 0
+            ? now - fpsUpdateTime
+            : 0;
+
+        unsigned long long inputDelta =
+            currentStats.inputFrames >= previousStats.inputFrames
+            ? currentStats.inputFrames - previousStats.inputFrames
+            : 0;
+
+        unsigned long long outputDelta =
+            currentStats.outputFrames >= previousStats.outputFrames
+            ? currentStats.outputFrames - previousStats.outputFrames
+            : 0;
+
+        unsigned long long emptyDelta =
+            currentStats.emptyCallbacks >= previousStats.emptyCallbacks
+            ? currentStats.emptyCallbacks - previousStats.emptyCallbacks
+            : 0;
+
+        unsigned long long paddedDelta =
+            currentStats.paddedFrames >= previousStats.paddedFrames
+            ? currentStats.paddedFrames - previousStats.paddedFrames
+            : 0;
+
+        double inputRate = elapsed > 0 ? inputDelta / elapsed : 0;
+        double outputRate = elapsed > 0 ? outputDelta / elapsed : 0;
+        double emptyRate = elapsed > 0 ? emptyDelta / elapsed : 0;
+        double paddedRate = elapsed > 0 ? paddedDelta / elapsed : 0;
+
+        int displayedFPS = MIN((int)videoFps, 60);
+        double displayedCoreFPS = actualCoreFPS;
+
+        NSString *diagnostics = [NSString stringWithFormat:
+            @"FPS %d  Actual Core %.1f\nIn %.0f/s  Out %.0f/s\nEmpty %.1f/s  Pad %.0f/s",
+            displayedFPS,
+            displayedCoreFPS,
+            inputRate,
+            outputRate,
+            emptyRate,
+            paddedRate
+        ];
+
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (IsiPhoneX) {
-               self.fpsLabel.text = [NSString stringWithFormat:@"FPS %d\nMax Core %d\nActual Core %.1f", MIN((int)videoFps, 60), (int)(coreFps / self.speed), actualCoreFPS];
-            } else {
-                self.fpsLabel.text = [NSString stringWithFormat:@"FPS %d Max Core %d Actual Core %.1f", MIN((int)videoFps, 60), (int)(coreFps / self.speed), actualCoreFPS];
-            }
+            self.fpsLabel.numberOfLines = 0;
+            self.fpsLabel.font = [UIFont systemFontOfSize:10];
+            self.fpsLabel.text = diagnostics;
+            [self.fpsLabel sizeToFit];
         });
-        fpsUpdateTime = CACurrentMediaTime();
+
+        previousStats = currentStats;
+        fpsUpdateTime = now;
     }
 }
 
