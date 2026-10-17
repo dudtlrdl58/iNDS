@@ -41,10 +41,7 @@ jobs:
 
           print(f"Patched configuration files: {count}")
           PY
-      - name: Inspect DeSmuME build flags
-        run: |
-          xcodebuild -project iNDS.xcodeproj -target DeSmuME-OpenEmu -configuration Release -sdk iphoneos -showBuildSettings GCC_THUMB_SUPPORT=YES > /tmp/desmume-settings.txt
-          grep -E 'THUMB|OTHER_CFLAGS|OTHER_CPLUSPLUSFLAGS|WARNING_CFLAGS' /tmp/desmume-settings.txt ||       
+     
       - name: Fix DeSmuME WiFi macro
         run: |
           python3 - <<'PY'
