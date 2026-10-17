@@ -80,6 +80,23 @@ jobs:
           path.write_bytes(data)
           print("MMU cache masks patched successfully")
           PY
+      - name: Fix DeSmuME libfat pointer check
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("desmume/desmume/src/utils/libfat/directory.cpp")
+          data = path.read_bytes()
+
+          old = b"src != '\\0'"
+          new = b"*src != '\\0'"
+
+          if data.count(old) != 1:
+              raise SystemExit("libfat pointer check not found exactly once")
+
+          path.write_bytes(data.replace(old, new, 1))
+          print("libfat pointer check patched successfully")
+          PY
       - name: Build iNDS
         run: |
           xcodebuild \
