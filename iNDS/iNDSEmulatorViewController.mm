@@ -122,7 +122,7 @@ enum VideoFilter : NSUInteger {
     iNDSButtonControlButton _previousButtons;
     iNDSDirectionalControlDirection _previousDirection;
     
-    NSLock *emuLoopLock;
+    dispatch_semaphore_t emuLoopLock;
     
     UIWindow *extWindow;
     
@@ -495,7 +495,7 @@ enum VideoFilter : NSUInteger {
         
     [self initGL];
     
-    emuLoopLock = [NSLock new];
+    emuLoopLock = dispatch_semaphore_create(1);
     
     if (self.saveState) EMU_loadState(self.saveState.fileSystemRepresentation);
     [self startEmulatorLoop];
@@ -629,8 +629,8 @@ enum VideoFilter : NSUInteger {
     NSLog(@"Pausing");
     if (!execute) return;
     EMU_pause(true);
-    [emuLoopLock lock]; // make sure emulator loop has ended
-    [emuLoopLock unlock];
+    dispatch_semaphore_wait(emuLoopLock, DISPATCH_TIME_FOREVER);
+    dispatch_semaphore_signal(emuLoopLock);
 }
 
 - (void)resumeEmulation
@@ -660,7 +660,7 @@ enum VideoFilter : NSUInteger {
     displaySemaphore = dispatch_semaphore_create(1);
     
     lastAutosave = CACurrentMediaTime();
-    [emuLoopLock lock];
+    dispatch_semaphore_wait(emuLoopLock, DISPATCH_TIME_FOREVER);
     [[iNDSMFIControllerSupport instance] startMonitoringGamePad];
     
     coreFps = videoFps = 30;
@@ -672,7 +672,7 @@ enum VideoFilter : NSUInteger {
 {
     NSLog(@"Ending loop");
     [[iNDSMFIControllerSupport instance] stopMonitoringGamePad];
-    [emuLoopLock unlock];
+    dispatch_semaphore_signal(emuLoopLock);
     coreLink.paused = YES;
 }
 
@@ -688,6 +688,7 @@ NSInteger filter = [[NSUserDefaults standardUserDefaults] integerForKey:@"videoF
 {
     if (!execute) {
         [self endEmulatorLoop];
+        return;
     }
     loopStart = CACurrentMediaTime();
     // Running under 60 fps makes the sound terrible
