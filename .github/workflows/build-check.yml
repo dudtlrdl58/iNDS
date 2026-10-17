@@ -88,11 +88,17 @@ jobs:
           path = Path("desmume/desmume/src/utils/libfat/directory.cpp")
           data = path.read_bytes()
 
-          old = b"src != '\\0'"
-          new = b"*src != '\\0'"
+          old = rb"while (count < len-1 && src != '\0')"
+          new = rb"while (count < len-1 && *src != '\0')"
 
-          if data.count(old) != 1:
-              raise SystemExit("libfat pointer check not found exactly once")
+          count = data.count(old)
+          print(f"Matched libfat statements: {count}")
+
+          if count != 1:
+              for line in data.splitlines():
+                  if b"count < len" in line and b"src" in line:
+                      print("Source:", repr(line))
+              raise SystemExit("Unable to patch libfat condition")
 
           path.write_bytes(data.replace(old, new, 1))
           print("libfat pointer check patched successfully")
