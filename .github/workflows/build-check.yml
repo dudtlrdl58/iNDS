@@ -103,6 +103,44 @@ jobs:
           path.write_bytes(data.replace(old, new, 1))
           print("libfat pointer check patched successfully")
           PY
+      - name: Fix iNDS controller enum types
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("iNDS/iNDSEmulatorViewController.mm")
+          data = path.read_bytes()
+
+          fixes = [
+              (
+                  b'self.directionalControl.style = [defaults integerForKey:@"controlPadStyle"];',
+                  b'self.directionalControl.style = (iNDSDirectionalControlStyle)[defaults integerForKey:@"controlPadStyle"];',
+                  1
+              ),
+              (
+                  b'controllerPressedDPad:0',
+                  b'controllerPressedDPad:(iNDSDirectionalControlDirection)0',
+                  4
+              ),
+              (
+                  b'controllerPressedABXY:0',
+                  b'controllerPressedABXY:(iNDSButtonControlButton)0',
+                  4
+              )
+          ]
+
+          for old, new, expected in fixes:
+              found = data.count(old)
+              print(f"Matches: {found}, expected: {expected}")
+              if found != expected:
+                  raise SystemExit("Unexpected controller code")
+
+          for old, new, expected in fixes:
+              data = data.replace(old, new)
+
+          path.write_bytes(data)
+          print("Controller enum types patched successfully")
+          PY
       - name: Build iNDS
         run: |
           xcodebuild \
