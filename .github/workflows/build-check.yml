@@ -59,6 +59,27 @@ jobs:
           path.write_bytes(data.replace(old, new))
           print("WiFi macro patched successfully")
           PY
+      - name: Fix DeSmuME cache masks
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("desmume/desmume/src/MMU_timing.h")
+          data = path.read_bytes()
+
+          replacements = (
+              (b"(u32)(~0 << TAGSHIFT)", b"(u32)(~0u << TAGSHIFT)"),
+              (b"(u32)(~0 << BLOCKSIZESHIFT)", b"(u32)(~0u << BLOCKSIZESHIFT)"),
+          )
+
+          for old, new in replacements:
+              if data.count(old) != 1:
+                  raise SystemExit(f"Unexpected match count: {old!r}")
+              data = data.replace(old, new)
+
+          path.write_bytes(data)
+          print("MMU cache masks patched successfully")
+          PY
       - name: Build iNDS
         run: |
           xcodebuild \
