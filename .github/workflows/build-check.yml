@@ -103,6 +103,47 @@ jobs:
           path.write_bytes(data.replace(old, new, 1))
           print("libfat pointer check patched successfully")
           PY
+            - name: Fix DeSmuME SPU register writes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("desmume/desmume/src/SPU.cpp")
+          source = path.read_text(encoding="utf-8")
+
+          pattern = re.compile(
+              r'\*\(u(?P<bits>8|16)\*\)\('
+              r'(?P<field>thischan\.(?:addr|timer|loopstart|length)|regs\.cap\[[01]\]\.(?:dad|len))'
+              r' \+ (?P<index>[0-3])\)\s*=\s*(?P<value>[^;]+);'
+          )
+
+          def fix_register_write(match):
+              bits = int(match["bits"])
+              shift = int(match["index"]) * bits
+              field = match["field"]
+              value = match["value"].strip()
+
+              bit_mask = (1 << bits) - 1
+              shifted_mask = bit_mask << shift
+
+              return (
+                  f"{field} = ({field} & ~0x{shifted_mask:08X}u) | "
+                  f"(((u32)({value}) & 0x{bit_mask:X}u) << {shift});"
+              )
+
+          patched, count = pattern.subn(fix_register_write, source)
+
+          print(f"SPU register writes patched: {count}")
+
+          if count != 32:
+              raise SystemExit(
+                  f"Expected 32 register fixes, found {count}"
+              )
+
+          path.write_text(patched, encoding="utf-8")
+          print("SPU register patch completed successfully")
+          PY
       - name: Fix iNDS controller enum types
         run: |
           python3 - <<'PY'
