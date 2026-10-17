@@ -36,4 +36,5 @@ jobs:
             -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
+            GCC_THUMB_SUPPORT=YES \
             build
