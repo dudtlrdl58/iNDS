@@ -34,7 +34,7 @@ jobs:
           for path in Path(".").rglob("*"):
               if path.name == "project.pbxproj" or path.suffix == ".xcconfig":
                   text = path.read_text(encoding="utf-8")
-                      if "-marm" in text:
+                  if "-marm" in text:
                       print(f"Removing -marm from {path}")
                       path.write_text(text.replace("-marm", ""), encoding="utf-8")
                       count += 1
