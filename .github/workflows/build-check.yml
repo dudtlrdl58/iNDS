@@ -103,7 +103,7 @@ jobs:
           path.write_bytes(data.replace(old, new, 1))
           print("libfat pointer check patched successfully")
           PY
-            - name: Fix DeSmuME SPU register writes
+      - name: Fix DeSmuME SPU register writes
         run: |
           python3 - <<'PY'
           from pathlib import Path
