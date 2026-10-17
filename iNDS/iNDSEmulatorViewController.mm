@@ -24,7 +24,7 @@
 #import <GameController/GameController.h>
 
 #include "emu.h"
-#include "core/sndcoreaudio.h"
+#include "core/sndcoreaudio_stats.h"
 //#include "mic.h"
 #import "SCLAlertView.h"
 

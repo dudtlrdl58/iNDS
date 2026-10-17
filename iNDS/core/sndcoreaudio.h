@@ -10,14 +10,9 @@
 #define iNDS_sndcoreaudio_h
 
 #include "SPU.h"
+#include "sndcoreaudio_stats.h"
 
 extern SoundInterface_struct SNDCoreAudio;
-struct SNDCoreAudioStats {
-    unsigned long long inputFrames;
-    unsigned long long outputFrames;
-    unsigned long long emptyCallbacks;
-    unsigned long long paddedFrames;
-};
 
 void SNDCoreAudioGetStats(SNDCoreAudioStats *stats);
 
