@@ -25,7 +25,22 @@ jobs:
         run: |
           gem install cocoapods --no-document
           pod install --repo-update
+      - name: Remove obsolete ARM flags
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
 
+          count = 0
+          for path in Path(".").rglob("*"):
+              if path.name == "project.pbxproj" or path.suffix == ".xcconfig":
+                  text = path.read_text(encoding="utf-8")
+                  if "-mno-thumb" in text:
+                      print(f"Removing -mno-thumb from {path}")
+                      path.write_text(text.replace("-mno-thumb", ""), encoding="utf-8")
+                      count += 1
+
+          print(f"Patched configuration files: {count}")
+          PY
       - name: Build iNDS
         run: |
           xcodebuild \
