@@ -10,6 +10,7 @@
 #include "SPU.h"
 #include "sndcoreaudio.h"
 #include "main.h"
+#include <pthread.h>
 
 int SNDCoreAudioInit(int buffersize);
 void SNDCoreAudioDeInit();
@@ -41,17 +42,25 @@ static s16 *sndBuffer[NUM_BUFFERS];
 static bool audioQueueStarted = false;
 static AudioQueueBufferRef aqBuffer[NUM_BUFFERS];
 static AudioQueueRef audioQueue;
+static pthread_mutex_t soundBufferMutex = PTHREAD_MUTEX_INITIALIZER;
 
 void SNDCoreAudioCallback(void *data, AudioQueueRef mQueue, AudioQueueBufferRef mBuffer) {
     mBuffer->mAudioDataByteSize = sndBufferSize;
     void *mAudioData = mBuffer->mAudioData;
+
+    pthread_mutex_lock(&soundBufferMutex);
+
     if (numFullBuffers == 0) {
-        bzero(mAudioData, sndBufferSize);
+        memset(mAudioData, 0, sndBufferSize);
     } else {
         memcpy(mAudioData, sndBuffer[curReadBuffer], sndBufferSize);
+
         numFullBuffers--;
-        curReadBuffer = curReadBuffer ? 0 : 1;
+        curReadBuffer = (curReadBuffer + 1) % NUM_BUFFERS;
     }
+
+    pthread_mutex_unlock(&soundBufferMutex);
+
     AudioQueueEnqueueBuffer(mQueue, mBuffer, 0, NULL);
 }
 
@@ -99,10 +108,32 @@ void SNDCoreAudioDeInit() {
 }
 
 void SNDCoreAudioUpdateAudio(s16 *buffer, u32 num_samples) {
-    if (numFullBuffers == NUM_BUFFERS) return;
-    memcpy(sndBuffer[curFillBuffer], buffer, 4 * num_samples);
-    curFillBuffer = curFillBuffer ? 0 : 1;
+    if (buffer == NULL || num_samples == 0) return;
+
+    pthread_mutex_lock(&soundBufferMutex);
+
+    if (numFullBuffers == NUM_BUFFERS) {
+        pthread_mutex_unlock(&soundBufferMutex);
+        return;
+    }
+
+    const u32 maxSamples = sndBufferSize / 4;
+    const u32 samplesToCopy =
+        num_samples < maxSamples ? num_samples : maxSamples;
+
+    memset(sndBuffer[curFillBuffer], 0, sndBufferSize);
+
+    memcpy(
+        sndBuffer[curFillBuffer],
+        buffer,
+        samplesToCopy * 4
+    );
+
+    curFillBuffer = (curFillBuffer + 1) % NUM_BUFFERS;
     numFullBuffers++;
+
+    pthread_mutex_unlock(&soundBufferMutex);
+
     if (!audioQueueStarted) {
         audioQueueStarted = true;
         AudioQueueStart(audioQueue, NULL);
@@ -110,8 +141,14 @@ void SNDCoreAudioUpdateAudio(s16 *buffer, u32 num_samples) {
 }
 
 u32 SNDCoreAudioGetAudioSpace() {
-    if (numFullBuffers == NUM_BUFFERS) return 0;
-    return (sndBufferSize / 4);
+    pthread_mutex_lock(&soundBufferMutex);
+
+    u32 availableSpace =
+        (numFullBuffers == NUM_BUFFERS) ? 0 : (sndBufferSize / 4);
+
+    pthread_mutex_unlock(&soundBufferMutex);
+
+    return availableSpace;
 }
 
 void SNDCoreAudioMuteAudio() {

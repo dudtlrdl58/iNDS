@@ -678,6 +678,9 @@ enum VideoFilter : NSUInteger {
 //Relocate
 CFTimeInterval coreStart, loopStart;
 CGFloat framesToRender = 0;
+static NSUInteger actualCoreFrameCount = 0;
+static CFTimeInterval actualCoreLastTime = 0;
+static double actualCoreFPS = 0;
 NSInteger filter = [[NSUserDefaults standardUserDefaults] integerForKey:@"videoFilter"];
 
 - (void)emulatorLoop
@@ -696,6 +699,21 @@ NSInteger filter = [[NSUserDefaults standardUserDefaults] integerForKey:@"videoF
         }
         coreStart = CACurrentMediaTime();
         EMU_runCore();
+        actualCoreFrameCount++;
+
+CFTimeInterval actualCoreNow = CACurrentMediaTime();
+
+if (actualCoreLastTime == 0) {
+    actualCoreLastTime = actualCoreNow;
+}
+
+CFTimeInterval actualCoreElapsed = actualCoreNow - actualCoreLastTime;
+
+if (actualCoreElapsed >= 1.0) {
+    actualCoreFPS = actualCoreFrameCount / actualCoreElapsed;
+    actualCoreFrameCount = 0;
+    actualCoreLastTime = actualCoreNow;
+}
         coreFps = coreFps * 0.99 + (1 / (CACurrentMediaTime() - coreStart)) * 0.01;
     }
     
@@ -739,9 +757,9 @@ NSInteger filter = [[NSUserDefaults standardUserDefaults] integerForKey:@"videoF
     if (CACurrentMediaTime() - fpsUpdateTime > 1) {
         dispatch_async(dispatch_get_main_queue(), ^{
             if (IsiPhoneX) {
-                self.fpsLabel.text = [NSString stringWithFormat:@"FPS %d\nMax Core %d", MIN((int)videoFps, 60), (int)(coreFps / self.speed)];
+               self.fpsLabel.text = [NSString stringWithFormat:@"FPS %d\nMax Core %d\nActual Core %.1f", MIN((int)videoFps, 60), (int)(coreFps / self.speed), actualCoreFPS];
             } else {
-                self.fpsLabel.text = [NSString stringWithFormat:@"FPS %d Max Core %d", MIN((int)videoFps, 60), (int)(coreFps / self.speed)];
+                self.fpsLabel.text = [NSString stringWithFormat:@"FPS %d Max Core %d Actual Core %.1f", MIN((int)videoFps, 60), (int)(coreFps / self.speed), actualCoreFPS];
             }
         });
         fpsUpdateTime = CACurrentMediaTime();
